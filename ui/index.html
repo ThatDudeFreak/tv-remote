@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<title>TV Remote</title>
+<style>
+  *{box-sizing:border-box; margin:0; padding:0; -webkit-tap-highlight-color:transparent;}
+  body{background:#0b0e14; color:#e8eef5; font-family:-apple-system,BlinkMacSystemFont,"SF Pro",sans-serif;
+       padding:14px; padding-bottom:40px; max-width:480px; margin:0 auto; user-select:none;}
+  h1{font-size:18px; letter-spacing:2px; color:#4da3ff; text-align:center; margin:6px 0 14px;}
+  h2{font-size:11px; letter-spacing:2px; color:#7d8ca0; margin:18px 4px 8px;}
+  .grid{display:grid; gap:10px;}
+  .g2{grid-template-columns:1fr 1fr;} .g3{grid-template-columns:1fr 1fr 1fr;}
+  button{background:#161c26; border:1px solid #232c3a; color:#e8eef5; border-radius:14px;
+         font-size:17px; font-weight:600; padding:20px 8px; cursor:pointer; min-height:64px;}
+  button:active{background:#232c3a; transform:scale(.97);}
+  button.accent{background:#12325e; border-color:#4da3ff;}
+  button.power{background:#3a1420; border-color:#ff5470; font-size:20px;}
+  .dpad{display:grid; grid-template-columns:repeat(3,1fr); gap:10px; max-width:300px; margin:0 auto;}
+  .dpad button{min-height:68px; font-size:22px;}
+  .dpad .ok{background:#12325e; border-color:#4da3ff;}
+  .row{display:flex; gap:10px; margin-top:10px;}
+  .row input{flex:1; background:#161c26; border:1px solid #232c3a; color:#e8eef5;
+             border-radius:14px; padding:14px; font-size:16px;}
+  .row button{padding:14px 18px; min-height:0;}
+  #toast{position:fixed; bottom:24px; left:50%; transform:translateX(-50%);
+         background:#1c2530; padding:10px 20px; border-radius:20px; font-size:14px;
+         opacity:0; transition:opacity .25s; pointer-events:none;}
+</style>
+</head>
+<body>
+<h1>TV REMOTE</h1>
+
+<h2>TELEVISION</h2>
+<div class="grid g2">
+  <button class="power" data-post="/tv/key/KEY_POWER">&#9199; Power</button>
+  <button data-post="/macro/firestick">Fire Stick</button>
+</div>
+
+<h2>WATCH</h2>
+<div class="grid g2" id="apps"></div>
+
+<h2>FIRE STICK NAV</h2>
+<div class="dpad">
+  <span></span><button data-post="/stick/key/KEYCODE_DPAD_UP">&#9650;</button><span></span>
+  <button data-post="/stick/key/KEYCODE_DPAD_LEFT">&#9664;</button><button class="ok" data-post="/stick/key/KEYCODE_DPAD_CENTER">OK</button><button data-post="/stick/key/KEYCODE_DPAD_RIGHT">&#9654;</button>
+  <span></span><button data-post="/stick/key/KEYCODE_DPAD_DOWN">&#9660;</button><span></span>
+</div>
+<div class="grid g3" style="margin-top:10px;">
+  <button data-post="/stick/key/KEYCODE_BACK">&#8617; Back</button>
+  <button data-post="/stick/key/KEYCODE_HOME">Home</button>
+  <button data-post="/stick/key/KEYCODE_MEDIA_PLAY_PAUSE">&#10074;&#10074; Play</button>
+</div>
+
+<h2>VOLUME</h2>
+<div class="grid g3">
+  <button data-post="/tv/key/KEY_VOLUP">Vol +</button>
+  <button data-post="/tv/key/KEY_MUTE">Mute</button>
+  <button data-post="/tv/key/KEY_VOLDOWN">Vol &minus;</button>
+</div>
+
+<h2>TYPE ON STICK</h2>
+<div class="row">
+  <input id="typebox" placeholder="Search text..." enterkeyhint="send">
+  <button class="accent" id="typesend">Send</button>
+</div>
+
+<div id="toast"></div>
+<script>
+const FALLBACK_APPS = ["hulu","netflix","disney","prime","youtube"];
+function toast(msg){
+  const t=document.getElementById("toast");
+  t.textContent=msg; t.style.opacity=1;
+  clearTimeout(t._h); t._h=setTimeout(()=>t.style.opacity=0,1200);
+}
+async function post(path, label){
+  try{
+    const r=await fetch(path,{method:"POST"});
+    toast(r.ok ? (label||"Sent") : "Failed");
+  }catch(e){ toast("No bridge connection"); }
+}
+document.addEventListener("click",e=>{
+  const b=e.target.closest("button[data-post]");
+  if(b) post(b.dataset.post, b.textContent.trim());
+});
+async function loadApps(){
+  let apps=FALLBACK_APPS;
+  try{
+    const r=await fetch("/api/config");
+    if(r.ok) apps=(await r.json()).apps;
+  }catch(e){}
+  document.getElementById("apps").innerHTML=apps.map(a=>
+    `<button class="accent" data-post="/macro/${a}">${a[0].toUpperCase()+a.slice(1)}</button>`
+  ).join("");
+}
+document.getElementById("typesend").onclick=async()=>{
+  const v=document.getElementById("typebox").value.trim();
+  if(!v) return;
+  try{
+    await fetch("/stick/text",{method:"POST",headers:{"Content-Type":"application/json"},
+      body:JSON.stringify({text:v})});
+    toast("Typed"); document.getElementById("typebox").value="";
+  }catch(e){ toast("No bridge connection"); }
+};
+loadApps();
+</script>
+</body>
+</html>
